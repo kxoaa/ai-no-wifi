@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local AI Chatbot</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #121212; color: #e0e0e0; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #1e1e1e; padding: 15px; text-align: center; border-bottom: 1px solid #2d2d2d; }
+        #status { color: #888; font-size: 14px; margin-top: 5px; }
+        #chat-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .message { max-width: 75%; padding: 12px 16px; border-radius: 15px; line-height: 1.4; word-break: break-word; }
+        .user-msg { background: #007acc; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .ai-msg { background: #2d2d2d; color: #e0e0e0; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .system-msg { background: #332200; color: #ffcc00; align-self: center; font-size: 13px; border-radius: 5px; text-align: center; max-width: 90%; }
+        input-area { background: #1e1e1e; padding: 15px; display: flex; gap: 10px; border-top: 1px solid #2d2d2d; }
+        input[type="text"] { flex: 1; background: #2d2d2d; border: 1px solid #444; padding: 12px; border-radius: 8px; color: white; font-size: 16px; outline: none; }
+        input[type="text"]:disabled { opacity: 0.5; cursor: not-allowed; }
+        button { background: #007acc; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #005999; }
+        button:disabled { background: #444; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>Offline Browser AI</h2>
+        <div id="status">Initializing AI Engine...</div>
+    </header>
+
+    <div id="chat-container">
+        <div class="message ai-msg">Hello! Once my model weights finish downloading into your browser cache, you can turn off your Wi-Fi completely.</div>
+    </div>
+
+    <input-area>
+        <input type="text" id="userInput" placeholder="Waiting for model to load..." disabled>
+        <button id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+    </input-area>
+
+    <script type="module">
+        import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+
+        let generator;
+        const statusElement = document.getElementById('status');
+        const chatContainer = document.getElementById('chat-container');
+        const inputField = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendBtn');
+
+        // Initialize engine and download the model files to browser cache
+        async function loadAI() {
+            try {
+                statusElement.innerText = "Downloading model weights (~250MB)... Please wait.";
+                
+                // Using a fast, high-quality, lightweight conversational model
+                generator = await pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat');
+                
+                statusElement.innerText = "AI Ready! (Safe to disconnect Wi-Fi)";
+                statusElement.style.color = "#4caf50";
+                inputField.placeholder = "Type your message here...";
+                inputField.disabled = false;
+                sendButton.disabled = false;
+            } catch (error) {
+                statusElement.innerText = "Error loading AI. Refresh page.";
+                statusElement.style.color = "#f44336";
+                console.error(error);
+            }
+        }
+
+        window.sendMessage = async function() {
+            const text = inputField.value.trim();
+            if (!text) return;
+
+            // Append user message to screen
+            appendMessage(text, 'user-msg');
+            inputField.value = '';
+            
+            // Disable input while AI generation runs
+            inputField.disabled = true;
+            sendButton.disabled = true;
+
+            // Placeholder AI bubble
+            const aiMessageElement = appendMessage("Thinking...", 'ai-msg');
+
+            try {
+                // Formatting prompt strictly for chat model context
+                const prompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
+                
+                const output = await generator(prompt, { 
+                    max_new_tokens: 60,
+                    temperature: 0.7,
+                    repetition_penalty: 1.1
+                });
+
+                // Extract response and strip the format scaffolding
+                let rawReply = output[0].generated_text;
+                let cleanReply = rawReply.split('<|im_start|>assistant\n')[1] || rawReply;
+                cleanReply = cleanReply.replace('<|im_end|>', '').trim();
+
+                aiMessageElement.innerText = cleanReply;
+            } catch (err) {
+                aiMessageElement.innerText = "Error processing query.";
+            }
+
+            // Re-enable interface
+            inputField.disabled = false;
+            sendButton.disabled = false;
+            inputField.focus();
+        }
+
+        function appendMessage(text, className) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${className}`;
+            msgDiv.innerText = text;
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return msgDiv;
+        }
+
+        // Keep enter key functional for user experience
+        inputField.addEventListener("keypress", function(event) {
+            if (event.key === "Enter" && !inputField.disabled) {
+                sendMessage();
+            }
+        });
+
+        loadAI();
+    </script>
+</body>
+</html>
