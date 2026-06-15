@@ -13,7 +13,6 @@
         .message { max-width: 75%; padding: 12px 16px; border-radius: 15px; line-height: 1.4; word-break: break-word; }
         .user-msg { background: #007acc; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
         .ai-msg { background: #2d2d2d; color: #e0e0e0; align-self: flex-start; border-bottom-left-radius: 2px; }
-        .system-msg { background: #332200; color: #ffcc00; align-self: center; font-size: 13px; border-radius: 5px; text-align: center; max-width: 90%; }
         input-area { background: #1e1e1e; padding: 15px; display: flex; gap: 10px; border-top: 1px solid #2d2d2d; }
         input[type="text"] { flex: 1; background: #2d2d2d; border: 1px solid #444; padding: 12px; border-radius: 8px; color: white; font-size: 16px; outline: none; }
         input[type="text"]:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -30,11 +29,11 @@
     </header>
 
     <div id="chat-container">
-        <div class="message ai-msg">Hello! Once my model weights finish downloading into your browser cache, you can turn off your Wi-Fi completely.</div>
+        <div class="message ai-msg">Hello! Once the model finishes loading into your browser cache, you can safely turn off your Wi-Fi entirely.</div>
     </div>
 
     <input-area>
-        <input type="text" id="userInput" placeholder="Waiting for model to load..." disabled>
+        <input type="text" id="userInput" placeholder="Waiting for engine to load..." disabled>
         <button id="sendBtn" onclick="sendMessage()" disabled>Send</button>
     </input-area>
 
@@ -47,13 +46,12 @@
         const inputField = document.getElementById('userInput');
         const sendButton = document.getElementById('sendBtn');
 
-        // Initialize engine and download the model files to browser cache
         async function loadAI() {
             try {
-                statusElement.innerText = "Downloading model weights (~250MB)... Please wait.";
+                statusElement.innerText = "Downloading lightweight model weights (~360MB)...";
                 
-                // Using a fast, high-quality, lightweight conversational model
-                generator = await pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat');
+                // Using SmolLM2-360M: Optimized for fast, error-free browser generation
+                generator = await pipeline('text-generation', 'HuggingFaceTB/SmolLM2-360M-Instruct');
                 
                 statusElement.innerText = "AI Ready! (Safe to disconnect Wi-Fi)";
                 statusElement.style.color = "#4caf50";
@@ -61,7 +59,7 @@
                 inputField.disabled = false;
                 sendButton.disabled = false;
             } catch (error) {
-                statusElement.innerText = "Error loading AI. Refresh page.";
+                statusElement.innerText = "Error loading AI. Make sure you are using GitHub Pages or a local server.";
                 statusElement.style.color = "#f44336";
                 console.error(error);
             }
@@ -71,38 +69,34 @@
             const text = inputField.value.trim();
             if (!text) return;
 
-            // Append user message to screen
             appendMessage(text, 'user-msg');
             inputField.value = '';
             
-            // Disable input while AI generation runs
             inputField.disabled = true;
             sendButton.disabled = true;
 
-            // Placeholder AI bubble
             const aiMessageElement = appendMessage("Thinking...", 'ai-msg');
 
             try {
-                // Formatting prompt strictly for chat model context
-                const prompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
+                // Using standard conversational array structures for v3 compatibility
+                const messages = [{ role: "user", content: text }];
                 
-                const output = await generator(prompt, { 
-                    max_new_tokens: 60,
-                    temperature: 0.7,
-                    repetition_penalty: 1.1
+                const output = await generator(messages, { 
+                    max_new_tokens: 100,
+                    temperature: 0.6,
+                    repetition_penalty: 1.2
                 });
 
-                // Extract response and strip the format scaffolding
-                let rawReply = output[0].generated_text;
-                let cleanReply = rawReply.split('<|im_start|>assistant\n')[1] || rawReply;
-                cleanReply = cleanReply.replace('<|im_end|>', '').trim();
+                // Extract response cleanly without manual string splitting
+                const reply = output[0].generated_text;
+                const aiReply = reply[reply.length - 1].content;
 
-                aiMessageElement.innerText = cleanReply;
+                aiMessageElement.innerText = aiReply;
             } catch (err) {
-                aiMessageElement.innerText = "Error processing query.";
+                aiMessageElement.innerText = "Error generating response. Please try again.";
+                console.error(err);
             }
 
-            // Re-enable interface
             inputField.disabled = false;
             sendButton.disabled = false;
             inputField.focus();
@@ -117,7 +111,6 @@
             return msgDiv;
         }
 
-        // Keep enter key functional for user experience
         inputField.addEventListener("keypress", function(event) {
             if (event.key === "Enter" && !inputField.disabled) {
                 sendMessage();
